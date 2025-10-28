@@ -107,6 +107,43 @@ def main():
 
     request_s3 = boto3.client("s3", region_name=args.region)
 
+    while True:
+        try:
+            key, body = fetch_request(request_s3, args.request_bucket)
+            if key is None:
+                logging.info("No requests in %s; sleeping 100ms", args.request_bucket)
+                time.sleep(0.1)
+                continue
+
+            logging.info("Processing request %s: %s", key, body)
+            data = json.loads(body)
+
+            # Decide which processing function to call
+            client_args = {
+                "s3_client": s3 if args.storage == "bucket3" else None,
+                "bucket_name": args.bucket,
+                "dynamo_table": table if args.storage == "dynamodb" else None
+            }
+
+            if data["type"] == "create":
+                process_create_request(data, args.storage, **client_args)
+            elif data["type"] == "delete":
+                process_delete_request(data, args.storage, **client_args)
+            elif data["type"] == "update":
+                process_update_request(data, args.storage, **client_args)
+            else:
+                logging.warning("Unknown request type %s for key %s", data.get("type"), key)
+
+
+
+            request_s3.delete_object(Bucket=args.request_bucket, Key=key)
+            logging.info("Deleted request %s from request-bucket", key)
+
+        except Exception as e:
+            logging.error("Failed processing request %s: %s", key, e, exc_info=True)
+
+
+
 
 
 if __name__ == "__main__":
