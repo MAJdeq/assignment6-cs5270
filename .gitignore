@@ -3,3 +3,5 @@ logs
 venv
 producer.jar
 unittests/test.py
+docker.env
+consumer.log
